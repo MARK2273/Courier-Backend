@@ -29,9 +29,6 @@ const shipmentSchema = z.object({
   }),
   routing: z.object({
     portOfLoading: z.string().optional(),
-    finalDestination: z.string().optional(),
-    originCountry: z.string().optional(),
-    finalCountry: z.string().optional(),
   }),
   items: z.array(z.any()), // JSONB
   other: z.object({
@@ -85,9 +82,6 @@ export const createShipment = async (req: Request, res: Response) => {
 
       // Routing
       port_of_loading: data.routing.portOfLoading,
-      final_destination: data.routing.finalDestination,
-      origin_country: data.routing.originCountry,
-      final_country: data.routing.finalCountry,
 
       // Items
       packages: data.items,
