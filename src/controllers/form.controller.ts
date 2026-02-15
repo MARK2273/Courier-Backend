@@ -3,16 +3,46 @@ import { supabase } from '../config/supabase';
 import { z } from 'zod';
 
 const shipmentSchema = z.object({
-  sender_name: z.string(),
-  sender_address: z.string(),
-  receiver_name: z.string(),
-  receiver_address: z.string(),
-  invoice_number: z.string().optional(),
-  invoice_date: z.string().optional(),
-  origin: z.string(),
-  destination: z.string(),
-  box_count: z.preprocess((val) => Number(val), z.number()), // Handle string numbers
-  packages: z.array(z.any()), // JSONB
+  header: z.object({
+    service: z.string().optional(),
+    awbNo: z.string().optional(),
+    origin: z.string(),
+    destination: z.string(),
+    date: z.string().optional(),
+    invoiceNo: z.string().optional(),
+    invoiceDate: z.string().optional(),
+    boxNumber: z.preprocess((val) => String(val), z.string()), // Ensure string
+    serviceDetails: z.string().optional(),
+  }),
+  sender: z.object({
+    name: z.string(),
+    address: z.string(),
+    adhaar: z.string().optional(),
+    contact: z.string().optional(),
+    email: z.string().email().optional().or(z.literal('')),
+  }),
+  receiver: z.object({
+    name: z.string(),
+    address: z.string(),
+    contact: z.string().optional(),
+    email: z.string().email().optional().or(z.literal('')),
+  }),
+  routing: z.object({
+    portOfLoading: z.string().optional(),
+    finalDestination: z.string().optional(),
+    originCountry: z.string().optional(),
+    finalCountry: z.string().optional(),
+  }),
+  items: z.array(z.any()), // JSONB
+  other: z.object({
+    pcs: z.number().optional(),
+    weight: z.string().optional(),
+    volumetricWeight: z.string().optional(),
+    currency: z.string().optional(),
+    totalAmount: z.number().optional(),
+    amountInWords: z.string().optional(),
+    billingAmount: z.number().optional(),
+  }),
 });
 
 export const createShipment = async (req: Request, res: Response) => {
@@ -24,9 +54,57 @@ export const createShipment = async (req: Request, res: Response) => {
 
     const data = shipmentSchema.parse(req.body);
 
+    // Map frontend camelCase to DB snake_case
+    const dbData = {
+      user_id: userId,
+      tenant_id: req.user?.tenant_id,
+      
+      // Header
+      service: data.header.service,
+      awb_no: data.header.awbNo,
+      origin: data.header.origin,
+      destination: data.header.destination,
+      invoice_number: data.header.invoiceNo,
+      invoice_date: data.header.invoiceDate ? new Date(data.header.invoiceDate) : null,
+      shipment_date: data.header.date ? new Date(data.header.date) : null,
+      service_details: data.header.serviceDetails,
+      box_count: parseInt(data.header.boxNumber) || 1,
+
+      // Sender
+      sender_name: data.sender.name,
+      sender_address: data.sender.address,
+      sender_adhaar: data.sender.adhaar,
+      sender_contact: data.sender.contact,
+      sender_email: data.sender.email,
+
+      // Receiver
+      receiver_name: data.receiver.name,
+      receiver_address: data.receiver.address,
+      receiver_contact: data.receiver.contact,
+      receiver_email: data.receiver.email,
+
+      // Routing
+      port_of_loading: data.routing.portOfLoading,
+      final_destination: data.routing.finalDestination,
+      origin_country: data.routing.originCountry,
+      final_country: data.routing.finalCountry,
+
+      // Items
+      packages: data.items,
+
+      // Other
+      pcs: data.other.pcs,
+      weight: data.other.weight,
+      volumetric_weight: data.other.volumetricWeight,
+      currency: data.other.currency,
+      total_amount: data.other.totalAmount,
+      amount_in_words: data.other.amountInWords,
+      billing_amount: data.other.billingAmount,
+    };
+
     const { data: shipment, error } = await supabase
       .from('shipments')
-      .insert({ ...data, user_id: userId })
+      .insert(dbData)
       .select()
       .single();
 
@@ -55,7 +133,8 @@ export const getMyShipments = async (req: Request, res: Response) => {
     const { data: shipments, error } = await supabase
       .from('shipments')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', userId) 
+      // .eq('tenant_id', req.user?.tenant_id) // Optional: Double check tenant
       .order('created_at', { ascending: false });
 
     if (error) {

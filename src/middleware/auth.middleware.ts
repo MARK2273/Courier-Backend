@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 export interface UserPayload {
   id: string;
   email: string;
+  tenant_id: string;
 }
 
 declare global {
