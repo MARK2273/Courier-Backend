@@ -155,7 +155,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
     // Note: optimization - ideally use an RPC function for sum, but fetching just the column is okay for now
     let revenueQuery = supabase
       .from('shipments')
-      .select('total_amount')
+      .select('billing_amount')
       .eq('user_id', userId);
     
     // Apply same search filter to revenue calculation if search exists
@@ -167,7 +167,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
     const { data: revenueData, error: revenueError } = await revenueQuery;
     
     const totalRevenue = revenueData 
-      ? revenueData.reduce((sum, item) => sum + (item.total_amount || 0), 0) 
+      ? revenueData.reduce((sum, item) => sum + (item.billing_amount || 0), 0 ) 
       : 0;
 
     res.json({
