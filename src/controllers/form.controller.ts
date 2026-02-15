@@ -151,10 +151,30 @@ export const getMyShipments = async (req: Request, res: Response) => {
       return res.status(500).json({ message: 'Failed to fetch shipments', error: error.message });
     }
 
+    // Calculate Total Revenue (Sum of total_amount for all matching records)
+    // Note: optimization - ideally use an RPC function for sum, but fetching just the column is okay for now
+    let revenueQuery = supabase
+      .from('shipments')
+      .select('total_amount')
+      .eq('user_id', userId);
+    
+    // Apply same search filter to revenue calculation if search exists
+    if (search) {
+      const searchTerm = `%${search}%`;
+      revenueQuery = revenueQuery.or(`awb_no.ilike.${searchTerm},sender_name.ilike.${searchTerm},receiver_name.ilike.${searchTerm},origin.ilike.${searchTerm},destination.ilike.${searchTerm}`);
+    }
+
+    const { data: revenueData, error: revenueError } = await revenueQuery;
+    
+    const totalRevenue = revenueData 
+      ? revenueData.reduce((sum, item) => sum + (item.total_amount || 0), 0) 
+      : 0;
+
     res.json({
       data: shipments,
       meta: {
         total: count,
+        totalRevenue, // Send total revenue
         page,
         limit,
         totalPages: count ? Math.ceil(count / limit) : 0,
