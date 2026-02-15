@@ -124,19 +124,42 @@ export const getMyShipments = async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'User not authenticated' });
     }
 
-    const { data: shipments, error } = await supabase
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const search = (req.query.search as string) || '';
+    const offset = (page - 1) * limit;
+
+    let query = supabase
       .from('shipments')
-      .select('*')
-      .eq('user_id', userId) 
-      // .eq('tenant_id', req.user?.tenant_id) // Optional: Double check tenant
+      .select('*', { count: 'exact' }) // Get total count for pagination
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
+
+    // Apply Search Filter if search term exists
+    if (search) {
+      const searchTerm = `%${search}%`;
+      query = query.or(`awb_no.ilike.${searchTerm},sender_name.ilike.${searchTerm},receiver_name.ilike.${searchTerm},origin.ilike.${searchTerm},destination.ilike.${searchTerm}`);
+    }
+
+    // Apply Pagination
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: shipments, count, error } = await query;
 
     if (error) {
       console.error('Supabase error:', error);
       return res.status(500).json({ message: 'Failed to fetch shipments', error: error.message });
     }
 
-    res.json(shipments);
+    res.json({
+      data: shipments,
+      meta: {
+        total: count,
+        page,
+        limit,
+        totalPages: count ? Math.ceil(count / limit) : 0,
+      }
+    });
   } catch (error) {
     console.error('Fetch shipments error:', error);
     res.status(500).json({ message: 'Internal server error' });
