@@ -185,3 +185,29 @@ export const getMyShipments = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+export const getShipmentById = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    const { id } = req.params;
+
+    const { data: shipment, error } = await supabase
+      .from('shipments')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !shipment) {
+      return res.status(404).json({ message: 'Shipment not found' });
+    }
+
+    res.json(shipment);
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
