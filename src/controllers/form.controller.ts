@@ -131,7 +131,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
 
     let query = supabase
       .from('shipments')
-      .select('*, services(name)', { count: 'exact' }) // Get total count for pagination
+      .select('*, services(name, tracking_url_template)', { count: 'exact' }) // Get total count for pagination
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
@@ -172,9 +172,16 @@ export const getMyShipments = async (req: Request, res: Response) => {
 
     // Map nested services.name to service property for frontend compatibility
     const mappedShipments = shipments?.map(shipment => {
+      const serviceData = (shipment as any).services;
+      const trackingUrlTemplate = serviceData?.tracking_url_template;
+      const trackingUrl = trackingUrlTemplate && shipment.service_details
+        ? trackingUrlTemplate.replace('{{id}}', shipment.service_details)
+        : null;
+
       const mapped = {
         ...shipment,
-        service: (shipment as any).services?.name || null
+        service: serviceData?.name || null,
+        tracking_url: trackingUrl
       };
       delete (mapped as any).services;
       return mapped;
@@ -207,7 +214,7 @@ export const getShipmentById = async (req: Request, res: Response) => {
 
     const { data: shipment, error } = await supabase
       .from('shipments')
-      .select('*, services(name)')
+      .select('*, services(name, tracking_url_template)')
       .eq('id', id)
       .eq('user_id', userId)
       .single();
@@ -216,10 +223,17 @@ export const getShipmentById = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Shipment not found' });
     }
 
+    const serviceData = (shipment as any).services;
+    const trackingUrlTemplate = serviceData?.tracking_url_template;
+    const trackingUrl = trackingUrlTemplate && shipment.service_details
+      ? trackingUrlTemplate.replace('{{id}}', shipment.service_details)
+      : null;
+
     // Map nested services.name to service property for frontend compatibility
     const responseData = {
       ...shipment,
-      service: (shipment as any).services?.name || null
+      service: serviceData?.name || null,
+      tracking_url: trackingUrl
     };
     delete (responseData as any).services;
 
