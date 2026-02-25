@@ -4,7 +4,6 @@ import { z } from 'zod';
 
 const shipmentSchema = z.object({
   header: z.object({
-    service: z.string().optional(),
     awbNo: z.string().optional(),
     origin: z.string(),
     destination: z.string(),
@@ -13,6 +12,7 @@ const shipmentSchema = z.object({
     invoiceDate: z.string().optional(),
     boxNumber: z.preprocess((val) => String(val), z.string()), // Ensure string
     serviceDetails: z.string().optional(),
+    serviceId: z.string().uuid().optional(),
   }),
   sender: z.object({
     name: z.string(),
@@ -57,7 +57,6 @@ export const createShipment = async (req: Request, res: Response) => {
       tenant_id: req.user?.tenant_id,
       
       // Header
-      service: data.header.service,
       awb_no: data.header.awbNo,
       origin: data.header.origin,
       destination: data.header.destination,
@@ -65,6 +64,7 @@ export const createShipment = async (req: Request, res: Response) => {
       invoice_date: data.header.invoiceDate ? new Date(data.header.invoiceDate) : null,
       shipment_date: data.header.date ? new Date(data.header.date) : null,
       service_details: data.header.serviceDetails,
+      service_id: data.header.serviceId,
       box_count: parseInt(data.header.boxNumber) || 1,
 
       // Sender

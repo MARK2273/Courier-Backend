@@ -13,6 +13,14 @@ CREATE TABLE IF NOT EXISTS tenants (
 INSERT INTO tenants (tenant_id, name) VALUES ('shalibhadra', 'Shalibhadra Courier') ON CONFLICT (tenant_id) DO NOTHING;
 INSERT INTO tenants (tenant_id, name) VALUES ('navkar', 'Navkar Courier') ON CONFLICT (tenant_id) DO NOTHING;
 
+-- Create services table
+CREATE TABLE IF NOT EXISTS services (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Drop existing tables to recreate with new references
 DROP TABLE IF EXISTS shipments CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
@@ -46,7 +54,7 @@ CREATE TABLE IF NOT EXISTS shipments (
   origin TEXT NOT NULL,
   destination TEXT NOT NULL,
   port_of_loading TEXT,
-  service TEXT,
+  service_id UUID REFERENCES services(id),
   service_details TEXT,
   awb_no TEXT,
   box_count INTEGER NOT NULL,
@@ -65,3 +73,45 @@ CREATE TABLE IF NOT EXISTS shipments (
 -- ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE shipments ENABLE ROW LEVEL SECURITY;
+
+-- Insert initial services for shalibhadra
+DO $$
+DECLARE
+    shalibhadra_id UUID;
+BEGIN
+    SELECT id INTO shalibhadra_id FROM tenants WHERE tenant_id = 'shalibhadra';
+    
+    IF shalibhadra_id IS NOT NULL THEN
+        INSERT INTO services (name, tenant_id) VALUES 
+        ('FedEx', shalibhadra_id),
+        ('DHL', shalibhadra_id),
+        ('UPS', shalibhadra_id),
+        ('Mahavir', shalibhadra_id),
+        ('Bluedart', shalibhadra_id),
+        ('DTDC', shalibhadra_id),
+        ('Nandan', shalibhadra_id),
+        ('Delivery', shalibhadra_id)
+        ON CONFLICT DO NOTHING;
+    END IF;
+END $$;
+
+-- Insert initial services for navkar
+DO $$
+DECLARE
+    navkar_id UUID;
+BEGIN
+    SELECT id INTO navkar_id FROM tenants WHERE tenant_id = 'navkar';
+    
+    IF navkar_id IS NOT NULL THEN
+        INSERT INTO services (name, tenant_id) VALUES 
+        ('FedEx', navkar_id),
+        ('DHL', navkar_id),
+        ('UPS', navkar_id),
+        ('Mahavir', navkar_id),
+        ('Bluedart', navkar_id),
+        ('DTDC', navkar_id),
+        ('Nandan', navkar_id),
+        ('Delivery', navkar_id)
+        ON CONFLICT DO NOTHING;
+    END IF;
+END $$;
