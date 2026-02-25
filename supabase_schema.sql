@@ -1,20 +1,36 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create users table
+-- Create tenants table
+CREATE TABLE IF NOT EXISTS tenants (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id TEXT UNIQUE NOT NULL, -- The slug (e.g., 'shalibhadra')
+  name TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Insert initial tenants
+INSERT INTO tenants (tenant_id, name) VALUES ('shalibhadra', 'Shalibhadra Courier') ON CONFLICT (tenant_id) DO NOTHING;
+INSERT INTO tenants (tenant_id, name) VALUES ('navkar', 'Navkar Courier') ON CONFLICT (tenant_id) DO NOTHING;
+
+-- Drop existing tables to recreate with new references
+DROP TABLE IF EXISTS shipments CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+-- Create users table (updated)
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   email TEXT UNIQUE NOT NULL,
   password TEXT NOT NULL,
-  tenant_id TEXT NOT NULL DEFAULT 'default', -- Tenant Identifier
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create shipments table
+-- Create shipments table (updated)
 CREATE TABLE IF NOT EXISTS shipments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  tenant_id TEXT NOT NULL DEFAULT 'default', -- Store tenant ID for easier querying/backup
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
   sender_name TEXT NOT NULL,
   sender_address TEXT NOT NULL,
   sender_adhaar TEXT,
@@ -28,7 +44,6 @@ CREATE TABLE IF NOT EXISTS shipments (
   invoice_date DATE,
   shipment_date TIMESTAMP WITH TIME ZONE,
   origin TEXT NOT NULL,
-  destination TEXT NOT NULL,
   destination TEXT NOT NULL,
   port_of_loading TEXT,
   service TEXT,
@@ -46,9 +61,7 @@ CREATE TABLE IF NOT EXISTS shipments (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- RLS Policies (Optional but recommended, for now we rely on backend logic)
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE shipments ENABLE ROW LEVEL SECURITY;
-
--- Allow backend to read/write (if using service role, RLS is bypassed by default)
--- But for clarity, we can add policies if needed. For now, we skip complex RLS.
+-- RLS Policies
+-- ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE shipments ENABLE ROW LEVEL SECURITY;

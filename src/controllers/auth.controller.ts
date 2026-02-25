@@ -13,6 +13,7 @@ const loginSchema = z.object({
 export const login = async (req: Request, res: Response) => {
   try {
     const { email, password, tenantId } = loginSchema.parse(req.body);
+    console.log(`[AUTH] Login attempt: ${email} for tenant slug: ${tenantId}`);
 
     const { data: user, error } = await supabase
       .from('users')
@@ -21,19 +22,45 @@ export const login = async (req: Request, res: Response) => {
       .single();
 
     if (error || !user) {
+      console.log(`[AUTH] User not found or error: ${email}`);
+      if (error) {
+        console.error(`[AUTH] Supabase Error Detail:`, {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+      }
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
     // Check Tenant Access
-    if (tenantId && user.tenant_id !== tenantId) {
-       return res.status(403).json({ message: `Access denied.` });
+    if (tenantId) {
+      const { data: tenant, error: tenantError } = await supabase
+        .from('tenants')
+        .select('id, tenant_id')
+        .eq('tenant_id', tenantId)
+        .single();
+      
+      if (tenantError || !tenant) {
+        console.log(`[AUTH] Tenant slug not found: ${tenantId}`);
+        return res.status(403).json({ message: `Access denied. Tenant '${tenantId}' not found.` });
+      }
+
+      console.log(`[AUTH] Comparing User Tenant ID (${user.tenant_id}) with Resolved Tenant ID (${tenant.id})`);
+      if (user.tenant_id !== tenant.id) {
+         console.log(`[AUTH] Tenant mismatch for user ${email}`);
+         return res.status(403).json({ message: `Access denied. User does not belong to tenant '${tenantId}'.` });
+      }
     }
 
     const isValid = await verifyPassword(user.password, password);
     if (!isValid) {
+      console.log(`[AUTH] Invalid password for: ${email}`);
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
+    console.log(`[AUTH] Login successful: ${email}`);
     const token = jwt.sign(
       { id: user.id, email: user.email, tenant_id: user.tenant_id },
       process.env.JWT_SECRET as string,
@@ -45,7 +72,7 @@ export const login = async (req: Request, res: Response) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ errors: error.issues });
     }
-    console.error('Login error:', error);
+    console.error('[AUTH] Login error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
