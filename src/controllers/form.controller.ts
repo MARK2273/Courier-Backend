@@ -131,7 +131,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
 
     let query = supabase
       .from('shipments')
-      .select('*', { count: 'exact' }) // Get total count for pagination
+      .select('*, services(name)', { count: 'exact' }) // Get total count for pagination
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
@@ -170,8 +170,18 @@ export const getMyShipments = async (req: Request, res: Response) => {
       ? revenueData.reduce((sum, item) => sum + (item.billing_amount || 0), 0 ) 
       : 0;
 
+    // Map nested services.name to service property for frontend compatibility
+    const mappedShipments = shipments?.map(shipment => {
+      const mapped = {
+        ...shipment,
+        service: (shipment as any).services?.name || null
+      };
+      delete (mapped as any).services;
+      return mapped;
+    });
+
     res.json({
-      data: shipments,
+      data: mappedShipments,
       meta: {
         total: count,
         totalRevenue, // Send total revenue
@@ -197,7 +207,7 @@ export const getShipmentById = async (req: Request, res: Response) => {
 
     const { data: shipment, error } = await supabase
       .from('shipments')
-      .select('*')
+      .select('*, services(name)')
       .eq('id', id)
       .eq('user_id', userId)
       .single();
@@ -206,7 +216,14 @@ export const getShipmentById = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Shipment not found' });
     }
 
-    res.json(shipment);
+    // Map nested services.name to service property for frontend compatibility
+    const responseData = {
+      ...shipment,
+      service: (shipment as any).services?.name || null
+    };
+    delete (responseData as any).services;
+
+    res.json(responseData);
   } catch (error) {
     res.status(500).json({ message: 'Internal server error' });
   }
