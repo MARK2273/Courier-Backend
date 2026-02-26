@@ -91,7 +91,8 @@ BEGIN
         ('Bluedart', shalibhadra_id, NULL),
         ('DTDC', shalibhadra_id, NULL),
         ('Nandan', shalibhadra_id, NULL),
-        ('Delivery', shalibhadra_id, NULL)
+        ('Delivery', shalibhadra_id, NULL),
+        ('Self', shalibhadra_id, NULL)
         ON CONFLICT DO NOTHING;
     END IF;
 END $$;
@@ -112,7 +113,9 @@ BEGIN
         ('Bluedart', navkar_id, NULL),
         ('DTDC', navkar_id, NULL),
         ('Nandan', navkar_id, NULL),
-        ('Delivery', navkar_id, NULL)
+        ('Delivery', navkar_id, NULL),
+        ('Self', navkar_id, NULL)
         ON CONFLICT DO NOTHING;
+
     END IF;
 END $$;
