@@ -287,7 +287,98 @@ export const deleteShipment = async (req: Request, res: Response) => {
 
     res.json({ message: 'Shipment deleted successfully' });
   } catch (error) {
-    console.error('Delete shipment error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const updateShipment = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const tenantId = req.user?.tenant_id;
+    if (!userId || !tenantId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    const { id } = req.params;
+    const data = shipmentSchema.parse(req.body);
+
+    // Verify ownership and existence
+    const { data: existing, error: fetchError } = await supabase
+      .from('shipments')
+      .select('tenant_id')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (fetchError || !existing) {
+      return res.status(404).json({ message: 'Shipment not found' });
+    }
+
+    if (existing.tenant_id !== tenantId) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    // Map frontend camelCase to DB snake_case
+    const dbData = {
+      // Header
+      awb_no: data.header.awbNo,
+      origin: data.header.origin,
+      destination: data.header.destination,
+      invoice_number: data.header.invoiceNo,
+      invoice_date: data.header.invoiceDate ? new Date(data.header.invoiceDate) : null,
+      shipment_date: data.header.date ? new Date(data.header.date) : null,
+      service_details: data.header.serviceDetails,
+      service_id: data.header.serviceId,
+      box_count: parseInt(data.header.boxNumber) || 1,
+
+      // Sender
+      sender_name: data.sender.name,
+      sender_address: data.sender.address,
+      sender_adhaar: data.sender.adhaar,
+      sender_contact: data.sender.contact,
+      sender_email: data.sender.email,
+
+      // Receiver
+      receiver_name: data.receiver.name,
+      receiver_address: data.receiver.address,
+      receiver_contact: data.receiver.contact,
+      receiver_email: data.receiver.email,
+
+      // Routing
+      port_of_loading: data.routing.portOfLoading,
+
+      // Items
+      packages: data.items,
+
+      // Other
+      pcs: data.other.pcs,
+      weight: data.other.weight,
+      volumetric_weight: data.other.volumetricWeight,
+      currency: data.other.currency,
+      total_amount: data.other.totalAmount,
+      amount_in_words: data.other.amountInWords,
+      billing_amount: data.other.billingAmount,
+    };
+
+    const { data: updated, error: updateError } = await supabase
+      .from('shipments')
+      .update(dbData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Supabase error:', updateError);
+      return res.status(500).json({ message: 'Failed to update shipment', error: updateError.message });
+    }
+
+    res.json(updated);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ errors: error.issues });
+    }
+    console.error('Update shipment error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
