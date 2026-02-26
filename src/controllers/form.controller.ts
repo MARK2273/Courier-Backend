@@ -133,6 +133,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
       .from('shipments')
       .select('*, services(name, tracking_url_template)', { count: 'exact' }) // Get total count for pagination
       .eq('user_id', userId)
+      .eq('is_deleted', false)
       .order('created_at', { ascending: false });
 
     // Apply Search Filter if search term exists
@@ -156,7 +157,8 @@ export const getMyShipments = async (req: Request, res: Response) => {
     let revenueQuery = supabase
       .from('shipments')
       .select('billing_amount')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .eq('is_deleted', false);
     
     // Apply same search filter to revenue calculation if search exists
     if (search) {
@@ -217,6 +219,7 @@ export const getShipmentById = async (req: Request, res: Response) => {
       .select('*, services(name, tracking_url_template)')
       .eq('id', id)
       .eq('user_id', userId)
+      .eq('is_deleted', false)
       .single();
 
     if (error || !shipment) {
@@ -239,6 +242,52 @@ export const getShipmentById = async (req: Request, res: Response) => {
 
     res.json(responseData);
   } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const deleteShipment = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const tenantId = req.user?.tenant_id;
+    if (!userId || !tenantId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    const { id } = req.params;
+
+    // First check if shipment exists and belongs to the user/tenant
+    const { data: existing, error: fetchError } = await supabase
+      .from('shipments')
+      .select('tenant_id')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (fetchError || !existing) {
+      return res.status(404).json({ message: 'Shipment not found' });
+    }
+
+    // Double check tenant isolation (though eq('user_id', userId) should be enough)
+    if (existing.tenant_id !== tenantId) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    // Perform soft delete
+    const { error: updateError } = await supabase
+      .from('shipments')
+      .update({ is_deleted: true })
+      .eq('id', id);
+
+    if (updateError) {
+      console.error('Supabase error:', updateError);
+      return res.status(500).json({ message: 'Failed to delete shipment', error: updateError.message });
+    }
+
+    res.json({ message: 'Shipment deleted successfully' });
+  } catch (error) {
+    console.error('Delete shipment error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
