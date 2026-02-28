@@ -72,3 +72,22 @@ export const trackShipment = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+export const getHsCodes = async (req: Request, res: Response) => {
+  try {
+    const { data: hsCodes, error } = await supabase
+      .from('hs_codes')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching HS codes:', error);
+      return res.status(500).json({ message: 'Failed to fetch HS codes' });
+    }
+
+    res.json(hsCodes);
+  } catch (error) {
+    console.error('HS codes fetch error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};

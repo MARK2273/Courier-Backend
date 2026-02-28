@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { trackShipment } from '../controllers/public.controller';
+import { trackShipment, getHsCodes } from '../controllers/public.controller';
 
 const router = Router();
 
 router.get('/track/:awb', trackShipment);
+router.get('/hs-codes', getHsCodes);
 
 export default router;
