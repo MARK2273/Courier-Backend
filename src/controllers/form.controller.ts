@@ -43,35 +43,44 @@ const shipmentSchema = z.object({
 });
 
 const generateAwbNo = async () => {
-  // Get the latest AWB number globally (regardless of tenant)
+  // Get all AWB numbers that are numeric to find the true maximum
   const { data, error } = await supabase
     .from('shipments')
     .select('awb_no')
-    .not('awb_no', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(1);
+    .not('awb_no', 'is', null);
 
   if (error) {
-    console.error('Error fetching last AWB:', error);
+    console.error('Error fetching AWBs:', error);
     throw new Error('Could not generate AWB number');
   }
 
-  const baseNumber = 102458;
+  const baseNumber = BigInt(102458);
   
   if (!data || data.length === 0) {
     return baseNumber.toString();
   }
 
-  const lastAwb = data[0].awb_no;
-  const lastNumber = parseInt(lastAwb);
+  // Filter for numeric AWBs and find the maximum using BigInt
+  let maxNumber = baseNumber;
+  let foundNumeric = false;
 
-  if (isNaN(lastNumber)) {
-    // If the last AWB is not a number, fallback to base + 1
-    return (baseNumber + 1).toString();
+  for (const row of data) {
+    if (row.awb_no && /^\d+$/.test(row.awb_no)) {
+      try {
+        const currentNumber = BigInt(row.awb_no);
+        if (!foundNumeric || currentNumber > maxNumber) {
+          maxNumber = currentNumber;
+          foundNumeric = true;
+        }
+      } catch (e) {
+        // Skip invalid BigInt strings
+      }
+    }
   }
 
-  // Increment the last number
-  return (lastNumber + 1).toString();
+  // If no numeric AWBs were found (unlikely), return baseNumber
+  // Otherwise, return maxNumber + 1
+  return (foundNumeric ? maxNumber + BigInt(1) : baseNumber).toString();
 };
 
 export const createShipment = async (req: Request, res: Response) => {
