@@ -139,7 +139,7 @@ export const createShipment = async (req: Request, res: Response) => {
       amount_in_words: data.other.amountInWords,
       billing_amount: data.other.billingAmount,
       payment_type: data.other.paymentType,
-      selected_upi_id: data.other.selectedUpiId,
+      selected_upi_id: data.other.paymentType === 'Cash' ? null : data.other.selectedUpiId,
     };
 
     const { data: shipment, error } = await supabase
@@ -261,7 +261,7 @@ export const getShipmentById = async (req: Request, res: Response) => {
 
     const { data: shipment, error } = await supabase
       .from('shipments')
-      .select('*, services(name, tracking_url_template)')
+      .select('*, services(name, tracking_url_template), upi_configs(upi_id, payee_name, display_name)')
       .eq('id', id)
       .eq('user_id', userId)
       .eq('is_deleted', false)
@@ -402,7 +402,7 @@ export const updateShipment = async (req: Request, res: Response) => {
       amount_in_words: data.other.amountInWords,
       billing_amount: data.other.billingAmount,
       payment_type: data.other.paymentType,
-      selected_upi_id: data.other.selectedUpiId,
+      selected_upi_id: data.other.paymentType === 'Cash' ? null : data.other.selectedUpiId,
     };
 
     const { data: updated, error: updateError } = await supabase
