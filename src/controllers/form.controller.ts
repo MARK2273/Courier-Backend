@@ -55,7 +55,7 @@ const generateAwbNo = async () => {
   }
 
   const baseNumber = BigInt(102458);
-  
+
   if (!data || data.length === 0) {
     return baseNumber.toString();
   }
@@ -97,7 +97,7 @@ export const createShipment = async (req: Request, res: Response) => {
     const dbData = {
       user_id: userId,
       tenant_id: tenantId,
-      
+
       // Header
       awb_no: await generateAwbNo(),
       origin: data.header.origin,
@@ -181,7 +181,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
     // Apply Search Filter if search term exists
     if (search) {
       const searchTerm = `%${search}%`;
-      query = query.or(`awb_no.ilike.${searchTerm},sender_name.ilike.${searchTerm},receiver_name.ilike.${searchTerm},origin.ilike.${searchTerm},destination.ilike.${searchTerm}`);
+      query = query.or(`awb_no.ilike.${searchTerm},sender_name.ilike.${searchTerm},receiver_name.ilike.${searchTerm},origin.ilike.${searchTerm},destination.ilike.${searchTerm},sender_contact.ilike.${searchTerm}`);
     }
 
     // Apply Pagination
@@ -201,17 +201,17 @@ export const getMyShipments = async (req: Request, res: Response) => {
       .select('billing_amount')
       .eq('user_id', userId)
       .eq('is_deleted', false);
-    
+
     // Apply same search filter to revenue calculation if search exists
     if (search) {
       const searchTerm = `%${search}%`;
-      revenueQuery = revenueQuery.or(`awb_no.ilike.${searchTerm},sender_name.ilike.${searchTerm},receiver_name.ilike.${searchTerm},origin.ilike.${searchTerm},destination.ilike.${searchTerm}`);
+      revenueQuery = revenueQuery.or(`awb_no.ilike.${searchTerm},sender_name.ilike.${searchTerm},receiver_name.ilike.${searchTerm},origin.ilike.${searchTerm},destination.ilike.${searchTerm},sender_contact.ilike.${searchTerm},receiver_contact.ilike.${searchTerm}`);
     }
 
     const { data: revenueData, error: revenueError } = await revenueQuery;
-    
-    const totalRevenue = revenueData 
-      ? revenueData.reduce((sum, item) => sum + (item.billing_amount || 0), 0 ) 
+
+    const totalRevenue = revenueData
+      ? revenueData.reduce((sum, item) => sum + (item.billing_amount || 0), 0)
       : 0;
 
     // Map nested services.name to service property for frontend compatibility
