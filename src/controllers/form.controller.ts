@@ -261,7 +261,7 @@ export const getShipmentById = async (req: Request, res: Response) => {
 
     const { data: shipment, error } = await supabase
       .from('shipments')
-      .select('*, services(name, tracking_url_template), upi_configs(upi_id, payee_name, display_name)')
+      .select('*, services(name, tracking_url_template)')
       .eq('id', id)
       .eq('user_id', userId)
       .eq('is_deleted', false)
