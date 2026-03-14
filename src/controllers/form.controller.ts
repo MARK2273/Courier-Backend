@@ -39,6 +39,7 @@ const shipmentSchema = z.object({
     totalAmount: z.number().optional(),
     amountInWords: z.string().optional(),
     billingAmount: z.number().optional(),
+    paymentType: z.enum(['Cash', 'Online']),
   }),
 });
 
@@ -136,6 +137,7 @@ export const createShipment = async (req: Request, res: Response) => {
       total_amount: data.other.totalAmount,
       amount_in_words: data.other.amountInWords,
       billing_amount: data.other.billingAmount,
+      payment_type: data.other.paymentType,
     };
 
     const { data: shipment, error } = await supabase
@@ -401,6 +403,7 @@ export const updateShipment = async (req: Request, res: Response) => {
       total_amount: data.other.totalAmount,
       amount_in_words: data.other.amountInWords,
       billing_amount: data.other.billingAmount,
+      payment_type: data.other.paymentType,
     };
 
     const { data: updated, error: updateError } = await supabase

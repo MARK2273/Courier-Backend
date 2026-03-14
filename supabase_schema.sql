@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS shipments (
   total_amount NUMERIC,
   amount_in_words TEXT,
   billing_amount NUMERIC,
+  payment_type TEXT DEFAULT 'Cash' NOT NULL,
   is_deleted BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
