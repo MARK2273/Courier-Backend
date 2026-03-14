@@ -40,6 +40,7 @@ const shipmentSchema = z.object({
     amountInWords: z.string().optional(),
     billingAmount: z.number().optional(),
     paymentType: z.enum(['Cash', 'Online']),
+    selectedUpiId: z.string().uuid().optional().nullable(),
   }),
 });
 
@@ -138,6 +139,7 @@ export const createShipment = async (req: Request, res: Response) => {
       amount_in_words: data.other.amountInWords,
       billing_amount: data.other.billingAmount,
       payment_type: data.other.paymentType,
+      selected_upi_id: data.other.selectedUpiId,
     };
 
     const { data: shipment, error } = await supabase
@@ -197,7 +199,6 @@ export const getMyShipments = async (req: Request, res: Response) => {
     }
 
     // Calculate Total Revenue (Sum of total_amount for all matching records)
-    // Note: optimization - ideally use an RPC function for sum, but fetching just the column is okay for now
     let revenueQuery = supabase
       .from('shipments')
       .select('billing_amount')
@@ -237,7 +238,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
       data: mappedShipments,
       meta: {
         total: count,
-        totalRevenue, // Send total revenue
+        totalRevenue,
         page,
         limit,
         totalPages: count ? Math.ceil(count / limit) : 0,
@@ -260,7 +261,7 @@ export const getShipmentById = async (req: Request, res: Response) => {
 
     const { data: shipment, error } = await supabase
       .from('shipments')
-      .select('*, services(name, tracking_url_template)')
+      .select('*, services(name, tracking_url_template), upi_configs(upi_id, payee_name, display_name)')
       .eq('id', id)
       .eq('user_id', userId)
       .eq('is_deleted', false)
@@ -276,16 +277,21 @@ export const getShipmentById = async (req: Request, res: Response) => {
       ? trackingUrlTemplate.replace('{{id}}', shipment.service_details)
       : null;
 
+    const upiConfig = (shipment as any).upi_configs;
+
     // Map nested services.name to service property for frontend compatibility
     const responseData = {
       ...shipment,
       service: serviceData?.name || null,
-      tracking_url: trackingUrl
+      tracking_url: trackingUrl,
+      upi_details: upiConfig || null
     };
     delete (responseData as any).services;
+    delete (responseData as any).upi_configs;
 
     res.json(responseData);
   } catch (error) {
+    console.error('Get shipment by ID error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -313,7 +319,6 @@ export const deleteShipment = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Shipment not found' });
     }
 
-    // Double check tenant isolation (though eq('user_id', userId) should be enough)
     if (existing.tenant_id !== tenantId) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
@@ -331,6 +336,7 @@ export const deleteShipment = async (req: Request, res: Response) => {
 
     res.json({ message: 'Shipment deleted successfully' });
   } catch (error) {
+    console.error('Delete shipment error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -365,8 +371,6 @@ export const updateShipment = async (req: Request, res: Response) => {
 
     // Map frontend camelCase to DB snake_case
     const dbData = {
-      // Header
-      // awb_no: data.header.awbNo, // REMOVED: AWB must not be updated
       origin: data.header.origin,
       destination: data.header.destination,
       invoice_number: data.header.invoiceNo,
@@ -376,26 +380,20 @@ export const updateShipment = async (req: Request, res: Response) => {
       service_id: data.header.serviceId,
       box_count: parseInt(data.header.boxNumber) || 1,
 
-      // Sender
       sender_name: data.sender.name,
       sender_address: data.sender.address,
       sender_adhaar: data.sender.adhaar,
       sender_contact: data.sender.contact,
       sender_email: data.sender.email,
 
-      // Receiver
       receiver_name: data.receiver.name,
       receiver_address: data.receiver.address,
       receiver_contact: data.receiver.contact,
       receiver_email: data.receiver.email,
 
-      // Routing
       port_of_loading: data.routing.portOfLoading,
-
-      // Items
       packages: data.items,
 
-      // Other
       pcs: data.other.pcs,
       weight: data.other.weight,
       volumetric_weight: data.other.volumetricWeight,
@@ -404,6 +402,7 @@ export const updateShipment = async (req: Request, res: Response) => {
       amount_in_words: data.other.amountInWords,
       billing_amount: data.other.billingAmount,
       payment_type: data.other.paymentType,
+      selected_upi_id: data.other.selectedUpiId,
     };
 
     const { data: updated, error: updateError } = await supabase
@@ -425,5 +424,36 @@ export const updateShipment = async (req: Request, res: Response) => {
     }
     console.error('Update shipment error:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const getUpiConfigs = async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.user?.tenant_id;
+    if (!tenantId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    const { data, error } = await supabase
+      .from('upi_configs')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching UPI configs:', error);
+      return res.status(500).json({ message: 'Error fetching UPI configurations' });
+    }
+
+    let defaultUpiId: string | null = null;
+    if (data && data.length > 0) {
+      defaultUpiId = data[0].id;
+    }
+
+    return res.status(200).json({ configs: data, defaultUpiId });
+  } catch (error) {
+    console.error('Error in getUpiConfigs:', error);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };

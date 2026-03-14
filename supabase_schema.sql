@@ -68,9 +68,24 @@ CREATE TABLE IF NOT EXISTS shipments (
   amount_in_words TEXT,
   billing_amount NUMERIC,
   payment_type TEXT DEFAULT 'Cash' NOT NULL,
+  selected_upi_id UUID REFERENCES upi_configs(id),
   is_deleted BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- UPI Configurations table
+CREATE TABLE IF NOT EXISTS upi_configs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id UUID NOT NULL, -- Assuming tenant_id is UUID based on token
+  display_name TEXT NOT NULL,
+  upi_id TEXT NOT NULL,
+  payee_name TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE upi_configs ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 -- ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
