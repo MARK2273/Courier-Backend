@@ -42,12 +42,11 @@ const shipmentSchema = z.object({
   }),
 });
 
-const generateAwbNo = async (tenantId: string) => {
-  // Get the latest AWB number for this tenant
+const generateAwbNo = async () => {
+  // Get the latest AWB number globally (regardless of tenant)
   const { data, error } = await supabase
     .from('shipments')
     .select('awb_no')
-    .eq('tenant_id', tenantId)
     .not('awb_no', 'is', null)
     .order('created_at', { ascending: false })
     .limit(1);
@@ -91,7 +90,7 @@ export const createShipment = async (req: Request, res: Response) => {
       tenant_id: tenantId,
       
       // Header
-      awb_no: await generateAwbNo(tenantId),
+      awb_no: await generateAwbNo(),
       origin: data.header.origin,
       destination: data.header.destination,
       invoice_number: data.header.invoiceNo,
