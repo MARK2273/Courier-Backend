@@ -42,10 +42,44 @@ const shipmentSchema = z.object({
   }),
 });
 
+const generateAwbNo = async (tenantId: string) => {
+  // Get the latest AWB number for this tenant
+  const { data, error } = await supabase
+    .from('shipments')
+    .select('awb_no')
+    .eq('tenant_id', tenantId)
+    .not('awb_no', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error('Error fetching last AWB:', error);
+    throw new Error('Could not generate AWB number');
+  }
+
+  const baseNumber = 102458;
+  
+  if (!data || data.length === 0) {
+    return baseNumber.toString();
+  }
+
+  const lastAwb = data[0].awb_no;
+  const lastNumber = parseInt(lastAwb);
+
+  if (isNaN(lastNumber)) {
+    // If the last AWB is not a number, fallback to base + 1
+    return (baseNumber + 1).toString();
+  }
+
+  // Increment the last number
+  return (lastNumber + 1).toString();
+};
+
 export const createShipment = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    if (!userId) {
+    const tenantId = req.user?.tenant_id;
+    if (!userId || !tenantId) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
 
@@ -54,10 +88,10 @@ export const createShipment = async (req: Request, res: Response) => {
     // Map frontend camelCase to DB snake_case
     const dbData = {
       user_id: userId,
-      tenant_id: req.user?.tenant_id,
+      tenant_id: tenantId,
       
       // Header
-      awb_no: data.header.awbNo,
+      awb_no: await generateAwbNo(tenantId),
       origin: data.header.origin,
       destination: data.header.destination,
       invoice_number: data.header.invoiceNo,
@@ -322,7 +356,7 @@ export const updateShipment = async (req: Request, res: Response) => {
     // Map frontend camelCase to DB snake_case
     const dbData = {
       // Header
-      awb_no: data.header.awbNo,
+      // awb_no: data.header.awbNo, // REMOVED: AWB must not be updated
       origin: data.header.origin,
       destination: data.header.destination,
       invoice_number: data.header.invoiceNo,
