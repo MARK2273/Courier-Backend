@@ -548,7 +548,13 @@ export const uploadPdf = async (req: Request, res: Response) => {
       return res.status(500).json({ message: 'Failed to update shipment with PDF URL', error: dbError.message });
     }
 
-    res.json({ message: 'PDF uploaded successfully', url: publicUrl });
+    const redirectUrl = `${req.protocol}://${req.get('host')}/api/public/shipment-pdf/${id}`;
+
+    res.json({ 
+      message: 'PDF uploaded successfully', 
+      url: publicUrl,
+      redirectUrl: redirectUrl
+    });
   } catch (error: any) {
     console.error('Upload Controller Error:', error);
     res.status(500).json({ message: 'Internal server error during PDF upload', error: error.message });
