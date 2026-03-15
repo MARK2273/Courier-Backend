@@ -41,7 +41,7 @@ export const login = async (req: Request, res: Response) => {
         .select('id, tenant_id')
         .eq('tenant_id', tenantId)
         .single();
-      
+
       if (tenantError || !tenant) {
         console.log(`[AUTH] Tenant slug not found: ${tenantId}`);
         return res.status(403).json({ message: `Access denied. Tenant '${tenantId}' not found.` });
@@ -49,8 +49,8 @@ export const login = async (req: Request, res: Response) => {
 
       console.log(`[AUTH] Comparing User Tenant ID (${user.tenant_id}) with Resolved Tenant ID (${tenant.id})`);
       if (user.tenant_id !== tenant.id) {
-         console.log(`[AUTH] Tenant mismatch for user ${email}`);
-         return res.status(403).json({ message: `Access denied. User does not belong to tenant '${tenantId}'.` });
+        console.log(`[AUTH] Tenant mismatch for user ${email}`);
+        return res.status(403).json({ message: `Access denied. User does not belong to tenant '${tenantId}'.` });
       }
     }
 
@@ -64,7 +64,7 @@ export const login = async (req: Request, res: Response) => {
     const token = jwt.sign(
       { id: user.id, email: user.email, tenant_id: user.tenant_id },
       process.env.JWT_SECRET as string,
-      { expiresIn: '2m' }
+      { expiresIn: '1d' }
     );
 
     res.json({ token, user: { id: user.id, email: user.email, tenant_id: user.tenant_id } });
