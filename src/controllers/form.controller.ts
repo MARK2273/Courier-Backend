@@ -200,10 +200,10 @@ export const getMyShipments = async (req: Request, res: Response) => {
       return res.status(500).json({ message: 'Failed to fetch shipments', error: error.message });
     }
 
-    // Calculate Total Revenue (Sum of total_amount for all matching records)
+    // Calculate Total Revenue and Owner Cost
     let revenueQuery = supabase
       .from('shipments')
-      .select('billing_amount')
+      .select('billing_amount, owner_cost')
       .eq('user_id', userId)
       .eq('is_deleted', false);
 
@@ -215,9 +215,15 @@ export const getMyShipments = async (req: Request, res: Response) => {
 
     const { data: revenueData, error: revenueError } = await revenueQuery;
 
-    const totalRevenue = revenueData
-      ? revenueData.reduce((sum, item) => sum + (item.billing_amount || 0), 0)
-      : 0;
+    let totalRevenue = 0;
+    let totalOwnerCost = 0;
+
+    if (revenueData) {
+      revenueData.forEach(item => {
+        totalRevenue += (item.billing_amount || 0);
+        totalOwnerCost += (item.owner_cost || 0);
+      });
+    }
 
     // Map nested services.name to service property for frontend compatibility
     const mappedShipments = shipments?.map(shipment => {
@@ -241,6 +247,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
       meta: {
         total: count,
         totalRevenue,
+        totalOwnerCost,
         page,
         limit,
         totalPages: count ? Math.ceil(count / limit) : 0,
