@@ -45,11 +45,25 @@ const shipmentSchema = z.object({
   }),
 });
 
+const getFinancialYear = (date: Date = new Date()) => {
+  const month = date.getMonth(); // 0 is January, 3 is April
+  const year = date.getFullYear();
+  const fyStart = month >= 3 ? year : year - 1;
+  const fyEnd = fyStart + 1;
+  // Format as YYYYyy (e.g., 202526)
+  return `${fyStart}${fyEnd.toString().slice(-2)}`;
+};
+
 const generateAwbNo = async () => {
-  // Get all AWB numbers that are numeric to find the true maximum
+  const currentFy = getFinancialYear();
+  const prefix = currentFy;
+  const baseSequence = BigInt(1);
+
+  // Get ALL AWB numbers to find the max for the CURRENT financial year
   const { data, error } = await supabase
     .from('shipments')
     .select('awb_no')
+    .like('awb_no', `${prefix}%`)
     .not('awb_no', 'is', null);
 
   if (error) {
@@ -57,33 +71,30 @@ const generateAwbNo = async () => {
     throw new Error('Could not generate AWB number');
   }
 
-  const baseNumber = BigInt(102458);
-
   if (!data || data.length === 0) {
-    return baseNumber.toString();
+    return `${prefix}${baseSequence.toString().padStart(6, '0')}`;
   }
 
-  // Filter for numeric AWBs and find the maximum using BigInt
-  let maxNumber = baseNumber;
-  let foundNumeric = false;
-
+  // Extract sequence numbers and find max
+  let maxSeq = BigInt(0);
   for (const row of data) {
-    if (row.awb_no && /^\d+$/.test(row.awb_no)) {
+    if (row.awb_no && row.awb_no.startsWith(prefix)) {
       try {
-        const currentNumber = BigInt(row.awb_no);
-        if (!foundNumeric || currentNumber > maxNumber) {
-          maxNumber = currentNumber;
-          foundNumeric = true;
+        // Extract sequence part (everything after prefix)
+        const seqStr = row.awb_no.slice(prefix.length);
+        if (seqStr) {
+          const seq = BigInt(seqStr);
+          if (seq > maxSeq) {
+            maxSeq = seq;
+          }
         }
-      } catch (e) {
-        // Skip invalid BigInt strings
-      }
+      } catch (e) {}
     }
   }
 
-  // If no numeric AWBs were found (unlikely), return baseNumber
-  // Otherwise, return maxNumber + 1
-  return (foundNumeric ? maxNumber + BigInt(1) : baseNumber).toString();
+  const nextSeq = maxSeq === BigInt(0) ? baseSequence : maxSeq + BigInt(1);
+    
+  return `${prefix}${nextSeq.toString().padStart(6, '0')}`;
 };
 
 export const createShipment = async (req: Request, res: Response) => {
