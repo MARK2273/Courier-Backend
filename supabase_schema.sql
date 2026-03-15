@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS shipments (
   selected_upi_id UUID REFERENCES upi_configs(id),
   owner_cost NUMERIC DEFAULT 0, -- Original cost to the owner
   is_deleted BOOLEAN DEFAULT FALSE,
+  payment_status TEXT DEFAULT 'Pending' NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

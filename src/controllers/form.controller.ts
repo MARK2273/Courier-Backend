@@ -43,6 +43,7 @@ const shipmentSchema = z.object({
     paymentType: z.enum(['Cash', 'Online']),
     selectedUpiId: z.string().uuid().optional().nullable(),
     ownerCost: z.number().optional().default(0),
+    paymentStatus: z.enum(['Paid', 'Pending']).optional().default('Pending'),
   }),
 });
 
@@ -154,6 +155,7 @@ export const createShipment = async (req: Request, res: Response) => {
       payment_type: data.other.paymentType,
       selected_upi_id: data.other.paymentType === 'Cash' ? null : data.other.selectedUpiId,
       owner_cost: data.other.ownerCost || 0,
+      payment_status: data.other.paymentStatus,
     };
 
     const { data: shipment, error } = await supabase
@@ -452,6 +454,7 @@ export const updateShipment = async (req: Request, res: Response) => {
       payment_type: data.other.paymentType,
       selected_upi_id: data.other.paymentType === 'Cash' ? null : data.other.selectedUpiId,
       owner_cost: data.other.ownerCost || 0,
+      payment_status: data.other.paymentStatus,
     };
 
     const { data: updated, error: updateError } = await supabase
