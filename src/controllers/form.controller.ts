@@ -200,10 +200,15 @@ export const getMyShipments = async (req: Request, res: Response) => {
       return res.status(500).json({ message: 'Failed to fetch shipments', error: error.message });
     }
 
-    // Calculate Total Revenue and Owner Cost
+    // Calculate Comparative Stats (Monthly)
+    const now = new Date();
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
     let revenueQuery = supabase
       .from('shipments')
-      .select('billing_amount, owner_cost')
+      .select('billing_amount, owner_cost, shipment_date')
       .eq('user_id', userId)
       .eq('is_deleted', false);
 
@@ -217,11 +222,29 @@ export const getMyShipments = async (req: Request, res: Response) => {
 
     let totalRevenue = 0;
     let totalOwnerCost = 0;
+    let thisMonthRevenue = 0;
+    let thisMonthCost = 0;
+    let lastMonthRevenue = 0;
+    let lastMonthCost = 0;
 
     if (revenueData) {
       revenueData.forEach(item => {
-        totalRevenue += (item.billing_amount || 0);
-        totalOwnerCost += (item.owner_cost || 0);
+        const amount = item.billing_amount || 0;
+        const cost = item.owner_cost || 0;
+        const date = item.shipment_date ? new Date(item.shipment_date) : null;
+
+        totalRevenue += amount;
+        totalOwnerCost += cost;
+
+        if (date) {
+          if (date >= startOfThisMonth) {
+            thisMonthRevenue += amount;
+            thisMonthCost += cost;
+          } else if (date >= startOfLastMonth && date <= endOfLastMonth) {
+            lastMonthRevenue += amount;
+            lastMonthCost += cost;
+          }
+        }
       });
     }
 
@@ -248,6 +271,10 @@ export const getMyShipments = async (req: Request, res: Response) => {
         total: count,
         totalRevenue,
         totalOwnerCost,
+        thisMonthRevenue,
+        thisMonthCost,
+        lastMonthRevenue,
+        lastMonthCost,
         page,
         limit,
         totalPages: count ? Math.ceil(count / limit) : 0,
