@@ -76,3 +76,34 @@ export const login = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+export const verifyOwnerPassword = async (req: Request, res: Response) => {
+  try {
+    const { password } = z.object({ password: z.string() }).parse(req.body);
+    const tenantId = req.user?.tenant_id;
+
+    if (!tenantId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const { data: tenant, error } = await supabase
+      .from('tenants')
+      .select('owner_password')
+      .eq('id', tenantId)
+      .single();
+
+    if (error || !tenant) {
+      return res.status(404).json({ message: 'Tenant not found' });
+    }
+
+    const isValid = await verifyPassword(tenant.owner_password, password);
+    if (isValid) {
+      return res.json({ success: true });
+    } else {
+      return res.status(401).json({ success: false, message: 'Invalid owner password' });
+    }
+  } catch (error) {
+    console.error('[AUTH] Owner verification error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};

@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS tenants (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tenant_id TEXT UNIQUE NOT NULL, -- The slug (e.g., 'shalibhadra')
   name TEXT NOT NULL,
+  owner_password TEXT DEFAULT 'owner123', -- Secondary password for owner mode
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -69,6 +70,7 @@ CREATE TABLE IF NOT EXISTS shipments (
   billing_amount NUMERIC,
   payment_type TEXT DEFAULT 'Cash' NOT NULL,
   selected_upi_id UUID REFERENCES upi_configs(id),
+  owner_cost NUMERIC DEFAULT 0, -- Original cost to the owner
   is_deleted BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
