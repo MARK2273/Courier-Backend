@@ -110,7 +110,7 @@ export const viewShipmentPdf = async (req: Request, res: Response) => {
 
     const { data: shipment, error } = await supabase
       .from('shipments')
-      .select('pdf_url')
+      .select('storage_pdf_url')
       .eq('id', id)
       .eq('is_deleted', false)
       .single();
@@ -119,12 +119,12 @@ export const viewShipmentPdf = async (req: Request, res: Response) => {
       return redirectToError('not-found');
     }
 
-    if (!shipment.pdf_url) {
+    if (!shipment.storage_pdf_url) {
       return redirectToError('pending');
     }
 
     // Redirect to the actual Supabase Storage URL
-    res.redirect(shipment.pdf_url);
+    res.redirect(shipment.storage_pdf_url);
   } catch (error) {
     console.error('View shipment PDF error:', error);
     return redirectToError('error');

@@ -538,17 +538,20 @@ export const uploadPdf = async (req: Request, res: Response) => {
     const publicUrl = urlData.publicUrl;
 
     // Update Shipment in DB
+    const redirectUrl = `${req.protocol}://${req.get('host')}/api/public/shipment-pdf/${id}`;
+
     const { error: dbError } = await supabase
       .from('shipments')
-      .update({ pdf_url: publicUrl })
+      .update({ 
+        pdf_url: redirectUrl,
+        storage_pdf_url: publicUrl 
+      })
       .eq('id', id);
 
     if (dbError) {
       console.error('Database Update Error:', dbError);
       return res.status(500).json({ message: 'Failed to update shipment with PDF URL', error: dbError.message });
     }
-
-    const redirectUrl = `${req.protocol}://${req.get('host')}/api/public/shipment-pdf/${id}`;
 
     res.json({ 
       message: 'PDF uploaded successfully', 
