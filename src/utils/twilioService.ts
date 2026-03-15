@@ -1,60 +1,115 @@
-// import twilio from 'twilio';
+import twilio from 'twilio';
 
-// const accountSid = process.env.TWILIO_ACCOUNT_SID;
-// const authToken = process.env.TWILIO_AUTH_TOKEN;
-// const twilioNumber = process.env.TWILIO_PHONE_NUMBER;
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+const twilioNumber = process.env.TWILIO_PHONE_NUMBER;
+const whatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER || twilioNumber;
 
-// // Initialize Twilio client only if credentials exist
-// const client = accountSid && authToken ? twilio(accountSid, authToken) : null;
+// Initialize Twilio client only if credentials exist
+const client = accountSid && authToken ? twilio(accountSid, authToken) : null;
 
-// /**
-//  * Core utility function to send an SMS using Twilio.
-//  * 
-//  * @param contactNumber The destination phone number.
-//  * @param messageBody The content of the SMS.
-//  */
-// export const sendSMS = async (contactNumber: string, messageBody: string): Promise<boolean> => {
-//   if (!client || !twilioNumber) {
-//     console.warn("Twilio credentials not configured in environment. Skipping SMS notification.");
-//     return false;
-//   }
+/**
+ * Formats a raw contact number into E.164 format.
+ */
+const formatPhoneNumber = (contactNumber: string): string | null => {
+  if (!contactNumber) return null;
+  const cleaned = contactNumber.replace(/\s+/g, '');
+  if (cleaned === '+91' || cleaned.length < 5) return null;
+  return cleaned.startsWith('+') ? cleaned : `+91${cleaned}`;
+};
 
-//   // Clean number by removing any spaces
-//   const cleanedContactNumber = contactNumber.replace(/\s+/g, '');
+/**
+ * Core utility function to send an SMS using Twilio.
+ * 
+ * @param contactNumber The destination phone number.
+ * @param messageBody The content of the SMS.
+ */
+export const sendSMS = async (contactNumber: string, messageBody: string): Promise<boolean> => {
+  if (!client || !twilioNumber) {
+    console.warn("Twilio credentials not configured in environment. Skipping SMS notification.");
+    return false;
+  }
 
-//   // Ensure contact number is formatted correctly (e.g., E.164 string with +91 or other country code)
-//   const to = cleanedContactNumber.startsWith('+') ? cleanedContactNumber : `+91${cleanedContactNumber}`;
+  const to = formatPhoneNumber(contactNumber);
+  if (!to) {
+    console.warn("Invalid contact number provided for SMS notification.");
+    return false;
+  }
 
-//   try {
-//     const message = await client.messages.create({
-//       body: messageBody,
-//       from: twilioNumber,
-//       to,
-//     });
-//     console.log(message)
-    
-//     console.log(`SMS sent successfully to ${to}. SID: ${message.sid}`);
-//     return true;
-//   } catch (error) {
-//     console.error(`Failed to send SMS to ${to}:`, error);
-//     return false;
-//   }
-// };
+  try {
+    const message = await client.messages.create({
+      body: messageBody,
+      from: twilioNumber,
+      to,
+    });
 
-// /**
-//  * Sends an SMS notification to the sender when their shipment is generated.
-//  * 
-//  * @param contactNumber The destination phone number. Must be verified in Twilio for trial accounts.
-//  * @param awbNo AWB number of the shipment
-//  * @param billingAmount Total billing amount of the shipment
-//  * @param pdfLink Frontend URL pointing to the shipment details/invoice page
-//  */
-// export const sendShipmentNotificationSMS = async (
-//   contactNumber: string,
-//   awbNo: string,
-//   billingAmount: number,
-//   pdfLink: string
-// ): Promise<boolean> => {
-//   const messageBody = `View your invoice here: ${pdfLink}`;
-//   return sendSMS(contactNumber, messageBody);
-// };
+    console.log(`SMS sent successfully to ${to}. SID: ${message.sid}`);
+    return true;
+  } catch (error) {
+    console.error(`Failed to send SMS to ${to}:`, error);
+    return false;
+  }
+};
+
+/**
+ * Core utility function to send a WhatsApp message using Twilio.
+ * 
+ * @param contactNumber The destination phone number.
+ * @param messageBody The content of the WhatsApp message.
+ */
+export const sendWhatsApp = async (contactNumber: string, messageBody: string): Promise<boolean> => {
+  if (!client || !twilioNumber) {
+    console.warn("Twilio credentials not configured in environment. Skipping WhatsApp notification.");
+    return false;
+  }
+
+  const formattedNumber = formatPhoneNumber(contactNumber);
+  if (!formattedNumber) {
+    console.warn("Invalid contact number provided for WhatsApp notification.");
+    return false;
+  }
+
+  const from = `whatsapp:${whatsappNumber}`;
+  const to = `whatsapp:${formattedNumber}`;
+
+  try {
+    const message = await client.messages.create({
+      body: messageBody,
+      from,
+      to,
+    });
+
+    console.log(`WhatsApp message sent successfully to ${to}. SID: ${message.sid}`);
+    return true;
+  } catch (error) {
+    console.error(`Failed to send WhatsApp message to ${to}:`, error);
+    return false;
+  }
+};
+
+/**
+ * Sends an SMS notification to the sender when their shipment is generated.
+ */
+export const sendShipmentNotificationSMS = async (
+  contactNumber: string,
+  awbNo: string,
+  billingAmount: number,
+  redirectLink: string
+): Promise<boolean> => {
+  const messageBody = `Shipment ${awbNo} generated. View your invoice here: ${redirectLink}`;
+  return sendSMS(contactNumber, messageBody);
+};
+
+/**
+ * Sends a WhatsApp notification to the sender when their shipment is generated.
+ */
+export const sendShipmentNotificationWhatsApp = async (
+  contactNumber: string,
+  awbNo: string,
+  billingAmount: number,
+  redirectLink: string
+): Promise<boolean> => {
+  const messageBody = `Shipment ${awbNo} generated. View your invoice here: https://cdteswhaqnawrpvivwmo.supabase.co/storage/v1/object/public/shipment-pdfs/a5c4df70-ca49-42d8-8e06-6e09e0ee244c/1773573623800.pdf`;
+  // const messageBody = `Shipment ${awbNo} generated. View your invoice here: ${redirectLink}`;
+  return sendWhatsApp(contactNumber, messageBody);
+};

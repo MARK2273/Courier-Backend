@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../config/supabase';
 import { z } from 'zod';
+import { sendShipmentNotificationSMS, sendShipmentNotificationWhatsApp } from '../utils/twilioService';
 
 const shipmentSchema = z.object({
   header: z.object({
@@ -542,9 +543,9 @@ export const uploadPdf = async (req: Request, res: Response) => {
 
     const { error: dbError } = await supabase
       .from('shipments')
-      .update({ 
+      .update({
         pdf_url: redirectUrl,
-        storage_pdf_url: publicUrl 
+        storage_pdf_url: publicUrl
       })
       .eq('id', id);
 
@@ -553,8 +554,35 @@ export const uploadPdf = async (req: Request, res: Response) => {
       return res.status(500).json({ message: 'Failed to update shipment with PDF URL', error: dbError.message });
     }
 
-    res.json({ 
-      message: 'PDF uploaded successfully', 
+    // Send SMS Notification (Non-blocking)
+    try {
+      const { data: shipment } = await supabase
+        .from('shipments')
+        .select('sender_contact, awb_no, billing_amount')
+        .eq('id', id)
+        .single();
+
+      if (shipment && shipment.sender_contact) {
+        sendShipmentNotificationSMS(
+          shipment.sender_contact,
+          shipment.awb_no,
+          shipment.billing_amount,
+          redirectUrl
+        ).catch(err => console.error('Delayed SMS Error:', err));
+
+        sendShipmentNotificationWhatsApp(
+          shipment.sender_contact,
+          shipment.awb_no,
+          shipment.billing_amount,
+          redirectUrl
+        ).catch(err => console.error('Delayed WhatsApp Error:', err));
+      }
+    } catch (smsError) {
+      console.error('Error initiating SMS notification:', smsError);
+    }
+
+    res.json({
+      message: 'PDF uploaded successfully',
       url: publicUrl,
       redirectUrl: redirectUrl
     });
