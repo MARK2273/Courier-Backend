@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createShipment, getMyShipments, getShipmentById, deleteShipment, updateShipment, getUpiConfigs, uploadPdf } from '../controllers/form.controller';
+import { createShipment, getMyShipments, getShipmentById, deleteShipment, updateShipment, getUpiConfigs, uploadPdf, updatePaymentStatus } from '../controllers/form.controller';
 import { authenticateToken } from '../middleware/auth.middleware';
 import multer from 'multer';
 
@@ -15,6 +15,7 @@ router.get('/upi-configs', getUpiConfigs);
 router.get('/mydata', getMyShipments);
 router.get('/:id', getShipmentById);
 router.put('/:id', updateShipment);
+router.patch('/:id/status', updatePaymentStatus);
 router.delete('/:id', deleteShipment);
 
 export default router;

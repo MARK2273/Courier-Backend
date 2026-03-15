@@ -659,3 +659,44 @@ export const uploadPdf = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Internal server error during PDF upload', error: error.message });
   }
 };
+
+export const updatePaymentStatus = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const tenantId = req.user?.tenant_id;
+    if (!userId || !tenantId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!['Paid', 'Pending'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid payment status. Must be "Paid" or "Pending".' });
+    }
+
+    // Verify ownership and update status
+    const { data: updated, error } = await supabase
+      .from('shipments')
+      .update({ payment_status: status })
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Update payment status error:', error);
+      return res.status(500).json({ message: 'Failed to update payment status', error: error.message });
+    }
+
+    if (!updated) {
+      return res.status(404).json({ message: 'Shipment not found or unauthorized' });
+    }
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Update payment status error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
