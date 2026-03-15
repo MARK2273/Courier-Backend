@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { supabase } from '../config/supabase';
+import { supabase, supabaseAdmin } from '../config/supabase';
 import { z } from 'zod';
 
 const shipmentSchema = z.object({
@@ -88,12 +88,12 @@ const generateAwbNo = async () => {
             maxSeq = seq;
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     }
   }
 
   const nextSeq = maxSeq === BigInt(0) ? baseSequence : maxSeq + BigInt(1);
-    
+
   return `${prefix}${nextSeq.toString().padStart(6, '0')}`;
 };
 
@@ -503,5 +503,54 @@ export const getUpiConfigs = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error in getUpiConfigs:', error);
     return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+export const uploadPdf = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const bucketName = process.env.SUPABASE_PDF_BUCKET || 'shipment-pdfs';
+    const filePath = `${id}/${Date.now()}.pdf`;
+
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+      .from(bucketName)
+      .upload(filePath, file.buffer, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('Supabase Storage Error:', uploadError);
+      return res.status(500).json({ message: 'Failed to upload PDF to storage', error: uploadError.message });
+    }
+
+    // Get Public URL
+    const { data: urlData } = supabaseAdmin.storage
+      .from(bucketName)
+      .getPublicUrl(filePath);
+
+    const publicUrl = urlData.publicUrl;
+
+    // Update Shipment in DB
+    const { error: dbError } = await supabase
+      .from('shipments')
+      .update({ pdf_url: publicUrl })
+      .eq('id', id);
+
+    if (dbError) {
+      console.error('Database Update Error:', dbError);
+      return res.status(500).json({ message: 'Failed to update shipment with PDF URL', error: dbError.message });
+    }
+
+    res.json({ message: 'PDF uploaded successfully', url: publicUrl });
+  } catch (error: any) {
+    console.error('Upload Controller Error:', error);
+    res.status(500).json({ message: 'Internal server error during PDF upload', error: error.message });
   }
 };
