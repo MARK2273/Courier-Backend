@@ -45,6 +45,14 @@ const shipmentSchema = z.object({
     ownerCost: z.number().optional().default(0),
     paymentStatus: z.enum(['Paid', 'Pending']).optional().default('Pending'),
   }),
+}).superRefine((data, ctx) => {
+  if (data.other.paymentType === 'Online' && !data.other.selectedUpiId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "UPI configuration is required for Online payments",
+      path: ['other', 'selectedUpiId'],
+    });
+  }
 });
 
 const getFinancialYear = (date: Date = new Date()) => {
@@ -214,7 +222,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
       return res.status(500).json({ message: 'Failed to fetch shipments', error: error.message });
     }
 
-    // Calculate Comparative Stats (Monthly)
+    // Calculate Comparative Stats (Monthly and Breakdown)
     const now = new Date();
     const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -222,7 +230,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
 
     let revenueQuery = supabase
       .from('shipments')
-      .select('billing_amount, owner_cost, shipment_date')
+      .select('billing_amount, owner_cost, shipment_date, payment_type, payment_status, selected_upi_id, upi_configs(display_name)')
       .eq('user_id', userId)
       .eq('is_deleted', false);
 
@@ -241,14 +249,62 @@ export const getMyShipments = async (req: Request, res: Response) => {
     let lastMonthRevenue = 0;
     let lastMonthCost = 0;
 
+    const collected = {
+      cash: 0,
+      upi: 0,
+      upiBreakdown: {} as Record<string, { amount: number; name: string }>,
+      total: 0
+    };
+
+    const pending = {
+      cash: 0,
+      upi: 0,
+      upiBreakdown: {} as Record<string, { amount: number; name: string }>,
+      total: 0
+    };
+
     if (revenueData) {
       revenueData.forEach(item => {
         const amount = item.billing_amount || 0;
         const cost = item.owner_cost || 0;
         const date = item.shipment_date ? new Date(item.shipment_date) : null;
+        const status = item.payment_status;
+        const type = item.payment_type;
+        const upiId = item.selected_upi_id;
+        const upiName = (item.upi_configs as any)?.display_name || 'Generic Online';
 
         totalRevenue += amount;
         totalOwnerCost += cost;
+
+        if (status === 'Paid') {
+          collected.total += amount;
+          if (type === 'Cash') {
+            collected.cash += amount;
+          } else if (type === 'Online') {
+            collected.upi += amount;
+            const effectiveUpiId = upiId || 'unspecified';
+            const effectiveUpiName = upiName || (upiId ? 'Generic Online' : 'Other/Unspecified');
+
+            if (!collected.upiBreakdown[effectiveUpiId]) {
+              collected.upiBreakdown[effectiveUpiId] = { amount: 0, name: effectiveUpiName };
+            }
+            collected.upiBreakdown[effectiveUpiId].amount += amount;
+          }
+        } else if (status === 'Pending') {
+          pending.total += amount;
+          if (type === 'Cash') {
+            pending.cash += amount;
+          } else if (type === 'Online') {
+            pending.upi += amount;
+            const effectiveUpiId = upiId || 'unspecified';
+            const effectiveUpiName = upiName || (upiId ? 'Generic Online' : 'Other/Unspecified');
+
+            if (!pending.upiBreakdown[effectiveUpiId]) {
+              pending.upiBreakdown[effectiveUpiId] = { amount: 0, name: effectiveUpiName };
+            }
+            pending.upiBreakdown[effectiveUpiId].amount += amount;
+          }
+        }
 
         if (date) {
           if (date >= startOfThisMonth) {
@@ -276,6 +332,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
         tracking_url: trackingUrl
       };
       delete (mapped as any).services;
+      delete (mapped as any).upi_configs;
       return mapped;
     });
 
@@ -289,6 +346,14 @@ export const getMyShipments = async (req: Request, res: Response) => {
         thisMonthCost,
         lastMonthRevenue,
         lastMonthCost,
+        collected: {
+          ...collected,
+          upiBreakdown: Object.values(collected.upiBreakdown)
+        },
+        pending: {
+          ...pending,
+          upiBreakdown: Object.values(pending.upiBreakdown)
+        },
         page,
         limit,
         totalPages: count ? Math.ceil(count / limit) : 0,
