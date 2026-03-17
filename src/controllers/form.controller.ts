@@ -198,14 +198,26 @@ export const getMyShipments = async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 10;
     const search = (req.query.search as string) || '';
     const status = (req.query.status as string) || '';
+    const paymentType = (req.query.paymentType as string) || '';
     const offset = (page - 1) * limit;
 
     let query = supabase
       .from('shipments')
       .select('*, services(name, tracking_url_template)', { count: 'exact' }) // Get total count for pagination
       .eq('user_id', userId)
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: false });
+      .eq('is_deleted', false);
+
+    // Apply Payment Type Filter
+    if (paymentType && ['Cash', 'Online'].includes(paymentType)) {
+      query = query.eq('payment_type', paymentType);
+    }
+    
+    // Apply Status Filter if status exists
+    if (status && ['Paid', 'Pending'].includes(status)) {
+      query = query.eq('payment_status', status);
+    }
+
+    query = query.order('created_at', { ascending: false });
 
     // Apply Search Filter if search term exists
     if (search) {
@@ -249,6 +261,11 @@ export const getMyShipments = async (req: Request, res: Response) => {
     // Apply same status filter to revenue calculation if status exists
     if (status && ['Paid', 'Pending'].includes(status)) {
       revenueQuery = revenueQuery.eq('payment_status', status);
+    }
+
+    // Apply same payment type filter to revenue calculation
+    if (paymentType && ['Cash', 'Online'].includes(paymentType)) {
+      revenueQuery = revenueQuery.eq('payment_type', paymentType);
     }
 
     const { data: revenueData, error: revenueError } = await revenueQuery;
