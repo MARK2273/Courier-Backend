@@ -197,6 +197,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const search = (req.query.search as string) || '';
+    const status = (req.query.status as string) || '';
     const offset = (page - 1) * limit;
 
     let query = supabase
@@ -210,6 +211,11 @@ export const getMyShipments = async (req: Request, res: Response) => {
     if (search) {
       const searchTerm = `%${search}%`;
       query = query.or(`awb_no.ilike.${searchTerm},sender_name.ilike.${searchTerm},receiver_name.ilike.${searchTerm},origin.ilike.${searchTerm},destination.ilike.${searchTerm},sender_contact.ilike.${searchTerm}`);
+    }
+
+    // Apply Status Filter if status exists
+    if (status && ['Paid', 'Pending'].includes(status)) {
+      query = query.eq('payment_status', status);
     }
 
     // Apply Pagination
@@ -238,6 +244,11 @@ export const getMyShipments = async (req: Request, res: Response) => {
     if (search) {
       const searchTerm = `%${search}%`;
       revenueQuery = revenueQuery.or(`awb_no.ilike.${searchTerm},sender_name.ilike.${searchTerm},receiver_name.ilike.${searchTerm},origin.ilike.${searchTerm},destination.ilike.${searchTerm},sender_contact.ilike.${searchTerm},receiver_contact.ilike.${searchTerm}`);
+    }
+
+    // Apply same status filter to revenue calculation if status exists
+    if (status && ['Paid', 'Pending'].includes(status)) {
+      revenueQuery = revenueQuery.eq('payment_status', status);
     }
 
     const { data: revenueData, error: revenueError } = await revenueQuery;
