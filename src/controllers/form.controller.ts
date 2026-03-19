@@ -21,6 +21,7 @@ const shipmentSchema = z.object({
     adhaar: z.string().optional(),
     contact: z.string().optional(),
     email: z.string().email().optional().or(z.literal('')),
+    gst: z.string().optional(),
   }),
   receiver: z.object({
     name: z.string(),
@@ -44,6 +45,12 @@ const shipmentSchema = z.object({
     selectedUpiId: z.string().uuid().optional().nullable(),
     ownerCost: z.number().optional().default(0),
     paymentStatus: z.enum(['Paid', 'Pending']).optional().default('Pending'),
+    taxType: z.enum(['none', 'cgst_sgst', 'igst']).optional().default('none'),
+    cgst: z.number().optional().default(0),
+    sgst: z.number().optional().default(0),
+    igst: z.number().optional().default(0),
+    taxAmount: z.number().optional().default(0),
+    finalBillingAmount: z.number().optional(),
   }),
 }).superRefine((data, ctx) => {
   if (data.other.paymentType === 'Online' && !data.other.selectedUpiId) {
@@ -139,6 +146,7 @@ export const createShipment = async (req: Request, res: Response) => {
       sender_adhaar: data.sender.adhaar,
       sender_contact: data.sender.contact,
       sender_email: data.sender.email,
+      sender_gst: data.sender.gst,
 
       // Receiver
       receiver_name: data.receiver.name,
@@ -164,6 +172,12 @@ export const createShipment = async (req: Request, res: Response) => {
       selected_upi_id: data.other.paymentType === 'Cash' ? null : data.other.selectedUpiId,
       owner_cost: data.other.ownerCost || 0,
       payment_status: data.other.paymentStatus,
+      tax_type: data.other.taxType,
+      cgst: data.other.cgst,
+      sgst: data.other.sgst,
+      igst: data.other.igst,
+      tax_amount: data.other.taxAmount,
+      final_billing_amount: data.other.finalBillingAmount,
     };
 
     const { data: shipment, error } = await supabase
@@ -528,6 +542,7 @@ export const updateShipment = async (req: Request, res: Response) => {
       sender_adhaar: data.sender.adhaar,
       sender_contact: data.sender.contact,
       sender_email: data.sender.email,
+      sender_gst: data.sender.gst,
 
       receiver_name: data.receiver.name,
       receiver_address: data.receiver.address,
@@ -548,6 +563,12 @@ export const updateShipment = async (req: Request, res: Response) => {
       selected_upi_id: data.other.paymentType === 'Cash' ? null : data.other.selectedUpiId,
       owner_cost: data.other.ownerCost || 0,
       payment_status: data.other.paymentStatus,
+      tax_type: data.other.taxType,
+      cgst: data.other.cgst,
+      sgst: data.other.sgst,
+      igst: data.other.igst,
+      tax_amount: data.other.taxAmount,
+      final_billing_amount: data.other.finalBillingAmount,
     };
 
     const { data: updated, error: updateError } = await supabase
