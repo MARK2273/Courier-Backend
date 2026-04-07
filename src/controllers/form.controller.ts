@@ -262,7 +262,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
 
     let revenueQuery = supabase
       .from('shipments')
-      .select('billing_amount, owner_cost, shipment_date, payment_type, payment_status, selected_upi_id, upi_configs(display_name)')
+      .select('total_amount, billing_amount, final_billing_amount, owner_cost, shipment_date, payment_type, payment_status, selected_upi_id, upi_configs(display_name)')
       .eq('user_id', userId)
       .eq('is_deleted', false);
 
@@ -307,8 +307,8 @@ export const getMyShipments = async (req: Request, res: Response) => {
 
     if (revenueData) {
       revenueData.forEach(item => {
-        const amount = item.billing_amount || 0;
-        const cost = item.owner_cost || 0;
+        const amount = item.final_billing_amount ?? item.billing_amount ?? item.total_amount ?? 0;
+        const cost = item.owner_cost ?? 0;
         const date = item.shipment_date ? new Date(item.shipment_date) : null;
         const status = item.payment_status;
         const type = item.payment_type;
@@ -675,22 +675,23 @@ export const uploadPdf = async (req: Request, res: Response) => {
     try {
       const { data: shipment } = await supabase
         .from('shipments')
-        .select('sender_contact, awb_no, billing_amount')
+        .select('sender_contact, awb_no, billing_amount, final_billing_amount')
         .eq('id', id)
         .single();
 
       if (shipment && shipment.sender_contact) {
+        const amount = shipment.final_billing_amount ?? shipment.billing_amount ?? 0;
         sendShipmentNotificationSMS(
           shipment.sender_contact,
           shipment.awb_no,
-          shipment.billing_amount,
+          amount,
           redirectUrl
         ).catch(err => console.error('Delayed SMS Error:', err));
 
         sendShipmentNotificationWhatsApp(
           shipment.sender_contact,
           shipment.awb_no,
-          shipment.billing_amount,
+          amount,
           redirectUrl
         ).catch(err => console.error('Delayed WhatsApp Error:', err));
       }
