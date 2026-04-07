@@ -51,6 +51,7 @@ const shipmentSchema = z.object({
     igst: z.number().optional().default(0),
     taxAmount: z.number().optional().default(0),
     finalBillingAmount: z.number().optional(),
+    utrNumber: z.string().optional().nullable(),
   }),
 }).superRefine((data, ctx) => {
   if (data.other.paymentType === 'Online' && !data.other.selectedUpiId) {
@@ -178,6 +179,7 @@ export const createShipment = async (req: Request, res: Response) => {
       igst: data.other.igst,
       tax_amount: data.other.taxAmount,
       final_billing_amount: data.other.finalBillingAmount,
+      utr_number: data.other.utrNumber,
     };
 
     const { data: shipment, error } = await supabase
@@ -569,6 +571,7 @@ export const updateShipment = async (req: Request, res: Response) => {
       igst: data.other.igst,
       tax_amount: data.other.taxAmount,
       final_billing_amount: data.other.finalBillingAmount,
+      utr_number: data.other.utrNumber,
     };
 
     const { data: updated, error: updateError } = await supabase
