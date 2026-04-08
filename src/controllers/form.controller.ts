@@ -14,6 +14,7 @@ const shipmentSchema = z.object({
     boxNumber: z.preprocess((val) => String(val), z.string()), // Ensure string
     serviceDetails: z.string().optional(),
     serviceId: z.string().uuid().optional(),
+    shipmentType: z.enum(['Docs', 'Non-Docs']).optional().default('Non-Docs'),
   }),
   sender: z.object({
     name: z.string(),
@@ -140,6 +141,7 @@ export const createShipment = async (req: Request, res: Response) => {
       shipment_date: data.header.date ? new Date(data.header.date) : null,
       service_details: data.header.serviceDetails,
       service_id: data.header.serviceId,
+      shipment_type: data.header.shipmentType || 'Non-Docs',
       box_count: parseInt(data.header.boxNumber) || 1,
 
       // Sender
@@ -539,6 +541,7 @@ export const updateShipment = async (req: Request, res: Response) => {
       shipment_date: data.header.date ? new Date(data.header.date) : null,
       service_details: data.header.serviceDetails,
       service_id: data.header.serviceId,
+      shipment_type: data.header.shipmentType || 'Non-Docs',
       box_count: parseInt(data.header.boxNumber) || 1,
 
       sender_name: data.sender.name,
