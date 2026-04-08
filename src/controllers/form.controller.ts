@@ -18,17 +18,19 @@ const shipmentSchema = z.object({
   }),
   sender: z.object({
     name: z.string(),
+    companyName: z.string().optional(),
     address: z.string(),
     adhaar: z.string().optional(),
     contact: z.string().optional(),
-    email: z.string().email().optional().or(z.literal('')),
+    email: z.string().email().optional().or(z.literal("")),
     gst: z.string().optional(),
   }),
   receiver: z.object({
     name: z.string(),
+    companyName: z.string().optional(),
     address: z.string(),
     contact: z.string().optional(),
-    email: z.string().email().optional().or(z.literal('')),
+    email: z.string().email().optional().or(z.literal("")),
   }),
   routing: z.object({
     portOfLoading: z.string().optional(),
@@ -146,6 +148,7 @@ export const createShipment = async (req: Request, res: Response) => {
 
       // Sender
       sender_name: data.sender.name,
+      sender_company: data.sender.companyName,
       sender_address: data.sender.address,
       sender_adhaar: data.sender.adhaar,
       sender_contact: data.sender.contact,
@@ -154,6 +157,7 @@ export const createShipment = async (req: Request, res: Response) => {
 
       // Receiver
       receiver_name: data.receiver.name,
+      receiver_company: data.receiver.companyName,
       receiver_address: data.receiver.address,
       receiver_contact: data.receiver.contact,
       receiver_email: data.receiver.email,
@@ -545,6 +549,7 @@ export const updateShipment = async (req: Request, res: Response) => {
       box_count: parseInt(data.header.boxNumber) || 1,
 
       sender_name: data.sender.name,
+      sender_company: data.sender.companyName,
       sender_address: data.sender.address,
       sender_adhaar: data.sender.adhaar,
       sender_contact: data.sender.contact,
@@ -552,6 +557,7 @@ export const updateShipment = async (req: Request, res: Response) => {
       sender_gst: data.sender.gst,
 
       receiver_name: data.receiver.name,
+      receiver_company: data.receiver.companyName,
       receiver_address: data.receiver.address,
       receiver_contact: data.receiver.contact,
       receiver_email: data.receiver.email,
