@@ -215,8 +215,8 @@ export const createShipment = async (req: Request, res: Response) => {
 
 export const getMyShipments = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
+    const tenantId = req.user?.tenant_id;
+    if (!tenantId) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
 
@@ -230,14 +230,14 @@ export const getMyShipments = async (req: Request, res: Response) => {
     let query = supabase
       .from('shipments')
       .select('*, services(name, tracking_url_template)', { count: 'exact' }) // Get total count for pagination
-      .eq('user_id', userId)
+      .eq('tenant_id', tenantId)
       .eq('is_deleted', false);
 
     // Apply Payment Type Filter
     if (paymentType && ['Cash', 'Online'].includes(paymentType)) {
       query = query.eq('payment_type', paymentType);
     }
-    
+
     // Apply Status Filter if status exists
     if (status && ['Paid', 'Pending'].includes(status)) {
       query = query.eq('payment_status', status);
@@ -275,7 +275,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
     let revenueQuery = supabase
       .from('shipments')
       .select('total_amount, billing_amount, final_billing_amount, owner_cost, shipment_date, payment_type, payment_status, selected_upi_id, upi_configs(display_name)')
-      .eq('user_id', userId)
+      .eq('tenant_id', tenantId)
       .eq('is_deleted', false);
 
     // Apply same search filter to revenue calculation if search exists
@@ -421,8 +421,8 @@ export const getMyShipments = async (req: Request, res: Response) => {
 
 export const getShipmentById = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
+    const tenantId = req.user?.tenant_id;
+    if (!tenantId) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
 
@@ -432,7 +432,7 @@ export const getShipmentById = async (req: Request, res: Response) => {
       .from('shipments')
       .select('*, services(name, tracking_url_template), upi_configs(upi_id, payee_name, display_name)')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('tenant_id', tenantId)
       .eq('is_deleted', false)
       .single();
 
@@ -467,9 +467,8 @@ export const getShipmentById = async (req: Request, res: Response) => {
 
 export const deleteShipment = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
     const tenantId = req.user?.tenant_id;
-    if (!userId || !tenantId) {
+    if (!tenantId) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
 
@@ -480,7 +479,7 @@ export const deleteShipment = async (req: Request, res: Response) => {
       .from('shipments')
       .select('tenant_id')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('tenant_id', tenantId)
       .eq('is_deleted', false)
       .single();
 
@@ -512,9 +511,8 @@ export const deleteShipment = async (req: Request, res: Response) => {
 
 export const updateShipment = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
     const tenantId = req.user?.tenant_id;
-    if (!userId || !tenantId) {
+    if (!tenantId) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
 
@@ -526,7 +524,7 @@ export const updateShipment = async (req: Request, res: Response) => {
       .from('shipments')
       .select('tenant_id')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('tenant_id', tenantId)
       .eq('is_deleted', false)
       .single();
 
@@ -729,9 +727,8 @@ export const uploadPdf = async (req: Request, res: Response) => {
 
 export const updatePaymentStatus = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
     const tenantId = req.user?.tenant_id;
-    if (!userId || !tenantId) {
+    if (!tenantId) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
 
@@ -748,7 +745,6 @@ export const updatePaymentStatus = async (req: Request, res: Response) => {
       .update({ payment_status: status })
       .eq('id', id)
       .eq('tenant_id', tenantId)
-      .eq('user_id', userId)
       .select()
       .single();
 
