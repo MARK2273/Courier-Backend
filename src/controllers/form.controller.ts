@@ -257,6 +257,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
     const search = (req.query.search as string) || '';
     const status = (req.query.status as string) || '';
     const paymentType = (req.query.paymentType as string) || '';
+    const taxFilter = (req.query.taxFilter as string) || 'All';
     const offset = (page - 1) * limit;
 
     let query = supabase
@@ -273,6 +274,13 @@ export const getMyShipments = async (req: Request, res: Response) => {
     // Apply Status Filter if status exists
     if (status && ['Paid', 'Pending'].includes(status)) {
       query = query.eq('payment_status', status);
+    }
+
+    // Apply Tax Filter
+    if (taxFilter === 'Taxed') {
+      query = query.neq('tax_type', 'none');
+    } else if (taxFilter === 'Non-Taxed') {
+      query = query.eq('tax_type', 'none');
     }
 
     query = query.order('created_at', { ascending: false });
