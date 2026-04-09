@@ -62,7 +62,12 @@ export const login = async (req: Request, res: Response) => {
 
     console.log(`[AUTH] Login successful: ${email}`);
     const token = jwt.sign(
-      { id: user.id, email: user.email, tenant_id: user.tenant_id },
+      { 
+        id: user.id, 
+        email: user.email, 
+        tenant_id: user.tenant_id,
+        can_show_tax: user.can_show_tax
+      },
       process.env.JWT_SECRET as string,
       { expiresIn: '1d' }
     );

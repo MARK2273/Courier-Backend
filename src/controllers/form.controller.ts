@@ -76,55 +76,87 @@ const getFinancialYear = (date: Date = new Date()) => {
   return `${fyStart}${fyEnd.toString().slice(-2)}`;
 };
 
-const generateAwbNo = async (tenantId: string) => {
-  const currentFy = getFinancialYear();
-  const prefix = currentFy;
-  const baseSequence = BigInt(1);
+const generateAwbNo = async (tenantId: string, canShowTax: boolean) => {
+  if (canShowTax) {
+    // Standard/Admin logic: Financial Year + Tenant Scoped Sequence
+    const currentFy = getFinancialYear();
+    const prefix = currentFy;
+    const baseSequence = BigInt(1);
 
-  // Get ALL AWB numbers to find the max for the CURRENT financial year AND CURRENT tenant
-  const { data, error } = await supabase
-    .from('shipments')
-    .select('awb_no')
-    .eq('tenant_id', tenantId) // Filter by tenant
-    .like('awb_no', `${prefix}%`)
-    .not('awb_no', 'is', null);
+    const { data, error } = await supabase
+      .from('shipments')
+      .select('awb_no')
+      .eq('tenant_id', tenantId)
+      .like('awb_no', `${prefix}%`)
+      .not('awb_no', 'is', null);
 
-  if (error) {
-    console.error('Error fetching AWBs:', error);
-    throw new Error('Could not generate AWB number');
-  }
+    if (error) {
+      console.error('Error fetching AWBs:', error);
+      throw new Error('Could not generate AWB number');
+    }
 
-  if (!data || data.length === 0) {
-    return `${prefix}${baseSequence.toString().padStart(6, '0')}`;
-  }
+    if (!data || data.length === 0) {
+      return `${prefix}${baseSequence.toString().padStart(6, '0')}`;
+    }
 
-  // Extract sequence numbers and find max
-  let maxSeq = BigInt(0);
-  for (const row of data) {
-    const awb = row.awb_no;
-    if (awb && awb.startsWith(prefix)) {
-      try {
-        // Extract sequence part (everything after prefix)
-        const seqStr = awb.slice(prefix.length);
-        if (seqStr) {
-          const seq = BigInt(seqStr);
-          if (seq > maxSeq) {
-            maxSeq = seq;
+    let maxSeq = BigInt(0);
+    for (const row of data) {
+      const awb = row.awb_no;
+      if (awb && awb.startsWith(prefix)) {
+        try {
+          const seqStr = awb.slice(prefix.length);
+          if (seqStr) {
+            const seq = BigInt(seqStr);
+            if (seq > maxSeq) maxSeq = seq;
           }
-        }
+        } catch (e) { }
+      }
+    }
+
+    const nextSeq = maxSeq === BigInt(0) ? baseSequence : maxSeq + BigInt(1);
+    return `${prefix}${nextSeq.toString().padStart(6, '0')}`;
+  } else {
+    // Restricted User logic: Global Unique Sequence (No year prefix)
+    const baseSequence = BigInt("300000000000");
+
+    const { data, error } = await supabase
+      .from('shipments')
+      .select('awb_no')
+      .not('awb_no', 'is', null)
+      .order('awb_no', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error('Error fetching AWBs:', error);
+      throw new Error('Could not generate AWB number');
+    }
+
+    if (!data || data.length === 0) {
+      return (baseSequence + BigInt(1)).toString();
+    }
+
+    let maxNum = BigInt(0);
+    for (const row of data) {
+      try {
+        const current = BigInt(row.awb_no);
+        if (current > maxNum) maxNum = current;
       } catch (e) { }
     }
+
+    if (maxNum < baseSequence) {
+      return (baseSequence + BigInt(1)).toString();
+    }
+
+    return (maxNum + BigInt(1)).toString();
   }
-
-  const nextSeq = maxSeq === BigInt(0) ? baseSequence : maxSeq + BigInt(1);
-
-  return `${prefix}${nextSeq.toString().padStart(6, '0')}`;
 };
 
 export const createShipment = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
     const tenantId = req.user?.tenant_id;
+    const canShowTax = req.user?.can_show_tax ?? true;
+
     if (!userId || !tenantId) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
@@ -137,7 +169,7 @@ export const createShipment = async (req: Request, res: Response) => {
       tenant_id: tenantId,
 
       // Header
-      awb_no: await generateAwbNo(tenantId),
+      awb_no: await generateAwbNo(tenantId, canShowTax),
       origin: data.header.origin,
       destination: data.header.destination,
       invoice_number: data.header.invoiceNo,

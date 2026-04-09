@@ -5,6 +5,7 @@ export interface UserPayload {
   id: string;
   email: string;
   tenant_id: string;
+  can_show_tax: boolean;
 }
 
 declare global {
