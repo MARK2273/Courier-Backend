@@ -76,15 +76,16 @@ const getFinancialYear = (date: Date = new Date()) => {
   return `${fyStart}${fyEnd.toString().slice(-2)}`;
 };
 
-const generateAwbNo = async () => {
+const generateAwbNo = async (tenantId: string) => {
   const currentFy = getFinancialYear();
   const prefix = currentFy;
   const baseSequence = BigInt(1);
 
-  // Get ALL AWB numbers to find the max for the CURRENT financial year
+  // Get ALL AWB numbers to find the max for the CURRENT financial year AND CURRENT tenant
   const { data, error } = await supabase
     .from('shipments')
     .select('awb_no')
+    .eq('tenant_id', tenantId) // Filter by tenant
     .like('awb_no', `${prefix}%`)
     .not('awb_no', 'is', null);
 
@@ -100,10 +101,11 @@ const generateAwbNo = async () => {
   // Extract sequence numbers and find max
   let maxSeq = BigInt(0);
   for (const row of data) {
-    if (row.awb_no && row.awb_no.startsWith(prefix)) {
+    const awb = row.awb_no;
+    if (awb && awb.startsWith(prefix)) {
       try {
         // Extract sequence part (everything after prefix)
-        const seqStr = row.awb_no.slice(prefix.length);
+        const seqStr = awb.slice(prefix.length);
         if (seqStr) {
           const seq = BigInt(seqStr);
           if (seq > maxSeq) {
@@ -135,7 +137,7 @@ export const createShipment = async (req: Request, res: Response) => {
       tenant_id: tenantId,
 
       // Header
-      awb_no: await generateAwbNo(),
+      awb_no: await generateAwbNo(tenantId),
       origin: data.header.origin,
       destination: data.header.destination,
       invoice_number: data.header.invoiceNo,
