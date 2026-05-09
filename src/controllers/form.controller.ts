@@ -803,3 +803,70 @@ export const updatePaymentStatus = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+export const permanentDeleteShipment = async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.user?.tenant_id;
+    const canShowTax = req.user?.can_show_tax;
+
+    if (!tenantId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    // Only admin users (can_show_tax = true) can permanently delete
+    if (!canShowTax) {
+      return res.status(403).json({ message: 'Forbidden. Only admin users can permanently delete shipments.' });
+    }
+
+    const { id } = req.params;
+
+    // First check if shipment exists and belongs to the tenant
+    const { data: existing, error: fetchError } = await supabase
+      .from('shipments')
+      .select('tenant_id, storage_pdf_url')
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (fetchError || !existing) {
+      return res.status(404).json({ message: 'Shipment not found' });
+    }
+
+    if (existing.tenant_id !== tenantId) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    // Delete associated PDF from Supabase Storage if it exists
+    if (existing.storage_pdf_url) {
+      try {
+        const bucketName = process.env.SUPABASE_PDF_BUCKET || 'shipment-pdfs';
+        // Extract the file path from the storage URL
+        const urlParts = existing.storage_pdf_url.split(`/storage/v1/object/public/${bucketName}/`);
+        if (urlParts.length > 1) {
+          const filePath = urlParts[1];
+          await supabaseAdmin.storage.from(bucketName).remove([filePath]);
+        }
+      } catch (storageError) {
+        console.error('Error deleting PDF from storage:', storageError);
+        // Continue with shipment deletion even if storage cleanup fails
+      }
+    }
+
+    // Permanently delete the shipment record
+    const { error: deleteError } = await supabase
+      .from('shipments')
+      .delete()
+      .eq('id', id)
+      .eq('tenant_id', tenantId);
+
+    if (deleteError) {
+      console.error('Supabase error:', deleteError);
+      return res.status(500).json({ message: 'Failed to permanently delete shipment', error: deleteError.message });
+    }
+
+    res.json({ message: 'Shipment permanently deleted successfully' });
+  } catch (error) {
+    console.error('Permanent delete shipment error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
