@@ -169,7 +169,9 @@ export const createShipment = async (req: Request, res: Response) => {
       tenant_id: tenantId,
 
       // Header
-      awb_no: await generateAwbNo(tenantId, canShowTax),
+      awb_no: data.header.awbNo?.trim()
+        ? data.header.awbNo.trim()
+        : await generateAwbNo(tenantId, canShowTax),
       origin: data.header.origin,
       destination: data.header.destination,
       invoice_number: data.header.invoiceNo,
