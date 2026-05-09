@@ -47,7 +47,7 @@ const shipmentSchema = z.object({
     paymentType: z.enum(['Cash', 'Online']),
     selectedUpiId: z.string().uuid().optional().nullable(),
     ownerCost: z.number().optional().default(0),
-    paymentStatus: z.enum(['Paid', 'Pending']).optional().default('Pending'),
+    paymentStatus: z.enum(['Paid', 'Pending', 'Cancelled']).optional().default('Pending'),
     taxType: z.enum(['none', 'cgst_sgst', 'igst']).optional().default('none'),
     cgst: z.number().optional().default(0),
     sgst: z.number().optional().default(0),
@@ -274,7 +274,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
     }
 
     // Apply Status Filter if status exists
-    if (status && ['Paid', 'Pending'].includes(status)) {
+    if (status && ['Paid', 'Pending', 'Cancelled'].includes(status)) {
       query = query.eq('payment_status', status);
     }
 
@@ -293,10 +293,7 @@ export const getMyShipments = async (req: Request, res: Response) => {
       query = query.or(`awb_no.ilike.${searchTerm},sender_name.ilike.${searchTerm},receiver_name.ilike.${searchTerm},origin.ilike.${searchTerm},destination.ilike.${searchTerm},sender_contact.ilike.${searchTerm}`);
     }
 
-    // Apply Status Filter if status exists
-    if (status && ['Paid', 'Pending'].includes(status)) {
-      query = query.eq('payment_status', status);
-    }
+    // Status filter already applied above — do not re-apply
 
     // Apply Pagination
     query = query.range(offset, offset + limit - 1);
@@ -327,8 +324,11 @@ export const getMyShipments = async (req: Request, res: Response) => {
     }
 
     // Apply same status filter to revenue calculation if status exists
-    if (status && ['Paid', 'Pending'].includes(status)) {
+    if (status && ['Paid', 'Pending', 'Cancelled'].includes(status)) {
       revenueQuery = revenueQuery.eq('payment_status', status);
+    } else {
+      // By default exclude cancelled from revenue calculations
+      revenueQuery = revenueQuery.neq('payment_status', 'Cancelled');
     }
 
     // Apply same payment type filter to revenue calculation
@@ -507,7 +507,7 @@ export const getShipmentById = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteShipment = async (req: Request, res: Response) => {
+export const cancelShipment = async (req: Request, res: Response) => {
   try {
     const tenantId = req.user?.tenant_id;
     if (!tenantId) {
@@ -519,7 +519,7 @@ export const deleteShipment = async (req: Request, res: Response) => {
     // First check if shipment exists and belongs to the user/tenant
     const { data: existing, error: fetchError } = await supabase
       .from('shipments')
-      .select('tenant_id')
+      .select('tenant_id, payment_status')
       .eq('id', id)
       .eq('tenant_id', tenantId)
       .eq('is_deleted', false)
@@ -533,20 +533,24 @@ export const deleteShipment = async (req: Request, res: Response) => {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
-    // Perform soft delete
+    if (existing.payment_status === 'Cancelled') {
+      return res.status(400).json({ message: 'Shipment is already cancelled' });
+    }
+
+    // Cancel the shipment by updating payment_status
     const { error: updateError } = await supabase
       .from('shipments')
-      .update({ is_deleted: true })
+      .update({ payment_status: 'Cancelled' })
       .eq('id', id);
 
     if (updateError) {
       console.error('Supabase error:', updateError);
-      return res.status(500).json({ message: 'Failed to delete shipment', error: updateError.message });
+      return res.status(500).json({ message: 'Failed to cancel shipment', error: updateError.message });
     }
 
-    res.json({ message: 'Shipment deleted successfully' });
+    res.json({ message: 'Shipment cancelled successfully' });
   } catch (error) {
-    console.error('Delete shipment error:', error);
+    console.error('Cancel shipment error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -777,8 +781,8 @@ export const updatePaymentStatus = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    if (!['Paid', 'Pending'].includes(status)) {
-      return res.status(400).json({ message: 'Invalid payment status. Must be "Paid" or "Pending".' });
+    if (!['Paid', 'Pending', 'Cancelled'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid payment status. Must be "Paid", "Pending", or "Cancelled".' });
     }
 
     // Verify ownership and update status
